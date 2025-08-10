@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Brain, Plus, Trash2, Clock, Calendar, BookOpen, ArrowRight, Loader } from 'lucide-react'
 import toast from 'react-hot-toast'
+import apiService from '../services/api'
 
 interface Subject {
   id: string
@@ -87,20 +88,42 @@ const StudyPlanPage = () => {
 
     setIsGenerating(true)
     try {
-      // Simulate AI generating study plan
-      await new Promise(resolve => setTimeout(resolve, 3000))
-      
-      // Store study plan data
-      const studyPlanData = {
-        subjects,
-        timeSlots,
-        studyMethod,
-        generatedAt: new Date().toISOString()
+      // Prepare data for API
+      const planData = {
+        study_method: studyMethod,
+        subjects: subjects.map(subject => ({
+          name: subject.name,
+          difficulty: subject.difficulty,
+          priority: subject.priority,
+          hours_per_week: subject.hoursPerWeek
+        })),
+        time_slots: timeSlots.map(slot => ({
+          day: slot.day,
+          start_time: slot.startTime,
+          end_time: slot.endTime,
+          is_available: slot.isAvailable
+        }))
       }
-      localStorage.setItem('studyPlan', JSON.stringify(studyPlanData))
-      
-      toast.success('Study plan generated successfully!')
-      navigate('/calendar')
+
+      const result = await apiService.generateStudyPlan(planData)
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
+
+      if (result.data) {
+        // Store study plan data locally as well
+        const studyPlanData = {
+          subjects,
+          timeSlots,
+          studyMethod,
+          generatedAt: new Date().toISOString()
+        }
+        localStorage.setItem('studyPlan', JSON.stringify(studyPlanData))
+        
+        toast.success('Study plan generated successfully!')
+        navigate('/calendar')
+      }
     } catch (error) {
       toast.error('Failed to generate study plan. Please try again.')
     } finally {

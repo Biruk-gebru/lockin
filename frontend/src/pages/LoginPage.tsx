@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Brain, Mail, Lock, Eye, EyeOff, Chrome } from 'lucide-react'
 import toast from 'react-hot-toast'
+import apiService from '../services/api'
 
 const LoginPage = () => {
   const navigate = useNavigate()
@@ -26,15 +27,27 @@ const LoginPage = () => {
     setIsLoading(true)
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
       if (isLogin) {
-        toast.success('Login successful!')
-        navigate('/questionnaire')
+        const result = await apiService.login(formData.email, formData.password)
+        if (result.error) {
+          toast.error(result.error)
+          return
+        }
+        if (result.data) {
+          localStorage.setItem('accessToken', result.data.access_token)
+          toast.success('Login successful!')
+          navigate('/questionnaire')
+        }
       } else {
-        toast.success('Account created successfully!')
-        navigate('/questionnaire')
+        const result = await apiService.register(formData.email, formData.name, formData.password)
+        if (result.error) {
+          toast.error(result.error)
+          return
+        }
+        if (result.data) {
+          toast.success('Account created successfully! Please log in.')
+          setIsLogin(true)
+        }
       }
     } catch (error) {
       toast.error('Something went wrong. Please try again.')
@@ -46,10 +59,19 @@ const LoginPage = () => {
   const handleGoogleAuth = async () => {
     setIsLoading(true)
     try {
-      // Simulate Google OAuth
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      toast.success('Google authentication successful!')
-      navigate('/questionnaire')
+      // For now, we'll simulate Google OAuth with a mock token
+      // In production, this would integrate with Google OAuth flow
+      const mockToken = 'google_mock_token_' + Date.now()
+      const result = await apiService.googleOAuth(mockToken)
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
+      if (result.data) {
+        localStorage.setItem('accessToken', result.data.access_token)
+        toast.success('Google authentication successful!')
+        navigate('/questionnaire')
+      }
     } catch (error) {
       toast.error('Google authentication failed. Please try again.')
     } finally {
