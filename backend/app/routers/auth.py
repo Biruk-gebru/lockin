@@ -9,7 +9,7 @@ import json
 
 from app.database import get_db
 from app.models import User
-from app.schemas import UserCreate, UserLogin, UserResponse, Token
+from app.schemas import UserCreate, UserLogin, UserResponse, Token, GoogleOAuthRequest
 from app.config import settings
 
 router = APIRouter()
@@ -104,12 +104,12 @@ async def login(user_credentials: UserLogin, db: Session = Depends(get_db)):
     
     return {"access_token": access_token, "token_type": "bearer"}
 
-@router.post("/google-oauth")
-async def google_oauth(google_token: str, db: Session = Depends(get_db)):
+@router.post("/google-oauth", response_model=Token)
+async def google_oauth(payload: GoogleOAuthRequest, db: Session = Depends(get_db)):
     # This would validate the Google token and create/update user
     # For now, we'll simulate the process
     try:
-        # In production, validate Google token here
+        # In production, validate Google token here using payload.google_token
         # For demo, we'll create a mock user
         mock_email = "user@google.com"  # This would come from Google token validation
         

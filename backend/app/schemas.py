@@ -111,5 +111,9 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
+
+class GoogleOAuthRequest(BaseModel):
+    google_token: str
+
 class TokenData(BaseModel):
     email: Optional[str] = None 

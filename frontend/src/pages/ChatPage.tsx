@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
-import { Brain, Send, User, Bot, Loader, Sparkles } from 'lucide-react'
+import { Brain, Send, User, Bot, Loader, Sparkles, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import apiService from '../services/api'
 
 interface Message {
   id: string
@@ -10,16 +11,10 @@ interface Message {
 }
 
 const ChatPage = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      content: "Hi! I'm your AI study companion. I can help you with study strategies, explain concepts, answer questions, and provide motivation. What would you like to know?",
-      role: 'assistant',
-      timestamp: new Date()
-    }
-  ])
+  const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
@@ -29,6 +24,39 @@ const ChatPage = () => {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  useEffect(() => {
+    loadChatHistory()
+  }, [])
+
+  const loadChatHistory = async () => {
+    try {
+      setIsLoadingHistory(true)
+      const response = await apiService.getChatHistory(50)
+      
+      if (response.data) {
+        const historyMessages: Message[] = response.data.map(msg => ({
+          id: msg.id.toString(),
+          content: msg.content,
+          role: msg.role as 'user' | 'assistant',
+          timestamp: new Date(msg.timestamp)
+        }))
+        
+        setMessages(historyMessages)
+      }
+    } catch (error) {
+      console.error('Failed to load chat history:', error)
+      // Add welcome message if no history
+      setMessages([{
+        id: '1',
+        content: "Hi! I'm your AI study companion. I can help you with study strategies, explain concepts, answer questions, and provide motivation. What would you like to know?",
+        role: 'assistant',
+        timestamp: new Date()
+      }])
+    } finally {
+      setIsLoadingHistory(false)
+    }
+  }
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return
@@ -45,71 +73,44 @@ const ChatPage = () => {
     setIsLoading(true)
 
     try {
-      // Simulate AI response with a delay
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      const response = await apiService.chatWithAI(inputMessage.trim())
       
-      const aiResponse = generateAIResponse(inputMessage.trim())
-      
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: aiResponse,
-        role: 'assistant',
-        timestamp: new Date()
-      }
+      if (response.data) {
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          content: response.data.response,
+          role: 'assistant',
+          timestamp: new Date()
+        }
 
-      setMessages(prev => [...prev, assistantMessage])
+        setMessages(prev => [...prev, assistantMessage])
+      } else if (response.error) {
+        toast.error(response.error)
+      }
     } catch (error) {
       toast.error('Failed to get response. Please try again.')
+      console.error('Chat error:', error)
     } finally {
       setIsLoading(false)
     }
   }
 
-  const generateAIResponse = (userInput: string): string => {
-    const input = userInput.toLowerCase()
-    
-    // Simple response logic - in real app, this would call the AI API
-    if (input.includes('pomodoro') || input.includes('timer')) {
-      return "The Pomodoro Technique is a time management method that uses 25-minute focused work sessions followed by 5-minute breaks. It helps maintain concentration and prevents mental fatigue. Try setting a timer for 25 minutes and focus solely on your task!"
+  const clearChatHistory = async () => {
+    try {
+      const response = await apiService.clearChatHistory()
+      if (response.data) {
+        setMessages([{
+          id: '1',
+          content: "Chat history cleared. How can I help you today?",
+          role: 'assistant',
+          timestamp: new Date()
+        }])
+        toast.success('Chat history cleared')
+      }
+    } catch (error) {
+      toast.error('Failed to clear chat history')
+      console.error('Clear history error:', error)
     }
-    
-    if (input.includes('motivation') || input.includes('motivated')) {
-      return "Remember, every expert was once a beginner. Your progress might feel slow, but consistency beats perfection. Take it one step at a time, celebrate small wins, and trust the process. You're building something amazing!"
-    }
-    
-    if (input.includes('memory') || input.includes('remember')) {
-      return "Active recall and spaced repetition are powerful memory techniques. Instead of just re-reading, try testing yourself on the material. Review concepts at increasing intervals - this strengthens neural pathways and improves long-term retention."
-    }
-    
-    if (input.includes('focus') || input.includes('concentration')) {
-      return "To improve focus: eliminate distractions, use the Pomodoro Technique, take regular breaks, stay hydrated, and create a dedicated study environment. Your brain works best when it can fully engage with one task at a time."
-    }
-    
-    if (input.includes('stress') || input.includes('anxiety')) {
-      return "It's normal to feel stressed about studies. Practice deep breathing, take regular breaks, maintain a consistent sleep schedule, and remember that your worth isn't defined by academic performance. You've got this!"
-    }
-    
-    if (input.includes('schedule') || input.includes('planning')) {
-      return "Effective study planning involves: identifying your most important tasks, scheduling them during your peak energy hours, building in buffer time for unexpected challenges, and reviewing your plan daily. Start with 2-3 main priorities per day."
-    }
-    
-    if (input.includes('math') || input.includes('mathematics')) {
-      return "Math is built on fundamentals - make sure you understand the basics before moving forward. Practice regularly, work through problems step by step, and don't be afraid to make mistakes. They're opportunities to learn!"
-    }
-    
-    if (input.includes('science') || input.includes('physics') || input.includes('chemistry')) {
-      return "Science subjects benefit from understanding the 'why' behind concepts. Connect theories to real-world examples, practice problem-solving, and use visual aids like diagrams. Break complex topics into smaller, manageable parts."
-    }
-    
-    if (input.includes('language') || input.includes('english') || input.includes('writing')) {
-      return "Language skills improve with consistent practice. Read regularly, write daily (even just a paragraph), expand your vocabulary, and practice speaking. Don't worry about perfection - focus on communication and clarity."
-    }
-    
-    if (input.includes('break') || input.includes('rest')) {
-      return "Taking breaks is crucial for learning! Your brain needs time to process and consolidate information. Try the 52/17 rule: 52 minutes of focused work, then 17 minutes of rest. Use breaks to move, hydrate, or do something completely different."
-    }
-    
-    return "That's an interesting question! While I can provide general study advice, for specific academic questions, I'd recommend consulting your course materials or instructor. Is there something specific about study techniques or learning strategies I can help you with?"
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -126,6 +127,17 @@ const ChatPage = () => {
     "Can you explain the Pomodoro Technique?",
     "How should I plan my study schedule?"
   ]
+
+  if (isLoadingHistory) {
+    return (
+      <div className="min-h-screen bg-background py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto text-center">
+          <Loader className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-gray-600">Loading chat history...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background py-12 px-4 sm:px-6 lg:px-8">
@@ -144,6 +156,17 @@ const ChatPage = () => {
           <p className="text-xl text-gray-600">
             Ask me anything about studying, learning strategies, or academic success
           </p>
+          
+          {/* Clear History Button */}
+          {messages.length > 1 && (
+            <button
+              onClick={clearChatHistory}
+              className="mt-4 inline-flex items-center px-3 py-2 text-sm text-gray-600 hover:text-red-600 transition-colors"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Clear Chat History
+            </button>
+          )}
         </div>
 
         {/* Chat Container */}

@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     google_client_secret: Optional[str] = None
     google_redirect_uri: str = "http://localhost:3000/auth/google/callback"
     
+    # Gemini AI (Google's AI model)
+    gemini_api: Optional[str] = None
+    gemini_model: str = "gemini-1.5-flash"
+    
     # GitHub AI (alternative to OpenAI)
     github_token: Optional[str] = None
     github_endpoint: str = "https://models.github.ai/inference"
@@ -26,5 +30,6 @@ class Settings(BaseSettings):
     
     class Config:
         env_file = ".env"
+        extra = "allow"  # Allow extra fields from environment
 
 settings = Settings() 

@@ -2,38 +2,174 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 import json
+import openai
+import httpx
+from openai import OpenAI
 
 from app.database import get_db
 from app.models import User, ChatMessage
 from app.schemas import AIChatRequest, AIChatResponse, ChatMessageCreate, ChatMessageResponse
 from app.routers.auth import get_current_user
+from app.config import settings
 
 router = APIRouter()
 
+# Initialize OpenAI client
+client = OpenAI(api_key=settings.openai_api_key)
+
 def get_ai_response(message: str, context: dict = None) -> str:
-    """Get AI response - placeholder for AI integration"""
+    """Get AI response using Gemini API with fallbacks"""
+    # Create system prompt for study assistant
+    system_prompt = """You are a helpful study assistant and learning coach. Your role is to:
+    1. Provide practical study advice and learning strategies
+    2. Help with time management and productivity techniques
+    3. Offer motivation and encouragement for academic success
+    4. Suggest effective study methods based on the user's questions
+    5. Keep responses concise but informative (2-3 sentences max)
+    
+    Focus on actionable advice that students can implement immediately."""
+    
+    # Try Gemini first (primary AI service)
+    if settings.gemini_api:
+        try:
+            return get_gemini_response(message, context, system_prompt)
+        except Exception as e:
+            print(f"Gemini failed: {e}, trying OpenAI...")
+    
+    # Fallback to OpenAI
+    if settings.openai_api_key:
+        try:
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": message}
+            ]
+            
+            # Add context if provided
+            if context:
+                context_str = json.dumps(context)
+                messages.insert(1, {"role": "system", "content": f"Context: {context_str}"})
+            
+            response = client.chat.completions.create(
+                model=settings.openai_model,
+                messages=messages,
+                max_tokens=150,
+                temperature=0.7
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            print(f"OpenAI failed: {e}, trying GitHub AI...")
+    
+    # Fallback to GitHub AI
+    if settings.github_token:
+        try:
+            return get_github_ai_response_sync(message, context, system_prompt)
+        except Exception as e:
+            print(f"GitHub AI failed: {e}")
+    
+    # Final fallback - return a helpful response
+    return get_fallback_response(message, context)
+
+def get_gemini_response(message: str, context: dict = None, system_prompt: str = None) -> str:
+    """Get AI response using Gemini API via HTTP"""
+    if not settings.gemini_api:
+        raise Exception("Gemini API key not configured")
+    
+    try:
+        # Prepare the request payload for Gemini API
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {
+                            "text": f"{system_prompt or 'You are a helpful study assistant.'}\n\n"
+                                   f"{'Context: ' + json.dumps(context) + '\n\n' if context else ''}"
+                                   f"User question: {message}"
+                        }
+                    ]
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.7,
+                "maxOutputTokens": 150
+            }
+        }
+        
+        headers = {
+            "Content-Type": "application/json"
+        }
+        
+        # Use the Gemini API endpoint
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.gemini_model}:generateContent?key={settings.gemini_api}"
+        
+        import requests
+        response = requests.post(url, json=payload, headers=headers, timeout=30.0)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if 'candidates' in data and len(data['candidates']) > 0:
+                content = data['candidates'][0].get('content', {})
+                parts = content.get('parts', [])
+                if parts and 'text' in parts[0]:
+                    return parts[0]['text'].strip()
+            
+            raise Exception("Unexpected response format from Gemini")
+        else:
+            raise Exception(f"Gemini API error: {response.status_code} - {response.text}")
+            
+    except Exception as e:
+        print(f"Gemini API error: {e}")
+        raise e
+
+def get_github_ai_response_sync(message: str, context: dict = None, system_prompt: str = None) -> str:
+    """Get AI response using GitHub AI API (synchronous version)"""
+    if not settings.github_token:
+        raise Exception("GitHub token not configured")
+    
+    # Prepare the request payload for GitHub AI
+    payload = {
+        "model": settings.github_model,
+        "messages": [
+            {"role": "system", "content": system_prompt or "You are a helpful study assistant."},
+            {"role": "user", "content": message}
+        ],
+        "max_tokens": 150,
+        "temperature": 0.7
+    }
+    
+    headers = {
+        "Authorization": f"Bearer {settings.github_token}",
+        "Content-Type": "application/json"
+    }
+    
+    import requests
+    response = requests.post(
+        settings.github_endpoint,
+        json=payload,
+        headers=headers,
+        timeout=30.0
+    )
+    
+    if response.status_code == 200:
+        data = response.json()
+        return data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+    else:
+        raise Exception(f"GitHub AI API error: {response.status_code} - {response.text}")
+
+def get_fallback_response(message: str, context: dict = None) -> str:
+    """Provide a helpful fallback response when AI services are unavailable"""
     message_lower = message.lower()
     
-    # Simple response logic - in real app, this would call AI API
-    if any(word in message_lower for word in ['pomodoro', 'timer']):
-        return "The Pomodoro Technique uses 25-minute focused work sessions followed by 5-minute breaks. This helps maintain concentration and prevents mental fatigue. Try setting a timer for 25 minutes and focus solely on your task!"
+    if any(word in message_lower for word in ['study', 'learn', 'focus']):
+        return "Great question! For effective studying, try the Pomodoro technique: 25 minutes of focused work followed by a 5-minute break. This helps maintain concentration and prevents burnout."
     
-    if any(word in message_lower for word in ['motivation', 'motivated']):
-        return "Remember, every expert was once a beginner. Your progress might feel slow, but consistency beats perfection. Take it one step at a time, celebrate small wins, and trust the process. You're building something amazing!"
+    elif any(word in message_lower for word in ['break', 'rest', 'exercise']):
+        return "During breaks, try: 1) Stand up and stretch for 2 minutes, 2) Look at something 20 feet away for 20 seconds, 3) Do 10 deep breaths. These simple activities refresh your mind and body."
     
-    if any(word in message_lower for word in ['memory', 'remember']):
-        return "Active recall and spaced repetition are powerful memory techniques. Instead of just re-reading, try testing yourself on the material. Review concepts at increasing intervals - this strengthens neural pathways and improves long-term retention."
+    elif any(word in message_lower for word in ['motivation', 'tired', 'bored']):
+        return "When motivation is low, start with just 5 minutes of work. Often, getting started is the hardest part. Once you begin, momentum usually takes over and you'll find yourself working longer than planned."
     
-    if any(word in message_lower for word in ['focus', 'concentration']):
-        return "To improve focus: eliminate distractions, use the Pomodoro Technique, take regular breaks, stay hydrated, and create a dedicated study environment. Your brain works best when it can fully engage with one task at a time."
-    
-    if any(word in message_lower for word in ['stress', 'anxiety']):
-        return "It's normal to feel stressed about studies. Practice deep breathing, take regular breaks, maintain a consistent sleep schedule, and remember that your worth isn't defined by academic performance. You've got this!"
-    
-    if any(word in message_lower for word in ['schedule', 'planning']):
-        return "Effective study planning involves: identifying your most important tasks, scheduling them during your peak energy hours, building in buffer time for unexpected challenges, and reviewing your plan daily. Start with 2-3 main priorities per day."
-    
-    return "That's an interesting question! While I can provide general study advice, for specific academic questions, I'd recommend consulting your course materials or instructor. Is there something specific about study techniques or learning strategies I can help you with?"
+    else:
+        return "I'm here to help with your studies! Try asking about specific study techniques, time management, or how to stay focused during long study sessions."
 
 @router.post("/chat", response_model=AIChatResponse)
 async def chat_with_ai(

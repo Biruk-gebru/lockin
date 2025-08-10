@@ -1,0 +1,21 @@
+nohup: ignoring input
+INFO:     Will watch for changes in these directories: ['/home/karanos/Desktop/loackin/backend']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [122582] using WatchFiles
+INFO:     Started server process [122589]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:33640 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52264 - "POST /api/auth/google-oauth HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'app/routers/auth.py', 'app/schemas.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [122589]
+INFO:     Started server process [122762]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:37388 - "OPTIONS /api/auth/google-oauth HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37396 - "POST /api/auth/google-oauth HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37708 - "OPTIONS /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37712 - "POST /api/auth/login HTTP/1.1" 401 Unauthorized

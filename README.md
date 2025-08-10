@@ -103,7 +103,3 @@ SECRET_KEY=your_secret_key
 - Distraction detection tracking
 - Streaks & gamification rewards
 - Advanced AI Q&A chatbot
-
-## 📄 License
-
-MIT License - see LICENSE file for details 

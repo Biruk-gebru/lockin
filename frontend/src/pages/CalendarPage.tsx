@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Brain, Calendar, Plus, Clock, BookOpen, ExternalLink, Settings, Sync } from 'lucide-react'
+import { Brain, Calendar, Plus, Clock, BookOpen, ExternalLink, Settings, RefreshCw } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface StudySession {
@@ -247,7 +247,7 @@ const CalendarPage = () => {
                 disabled={isLoading}
                 className="btn-secondary flex items-center"
               >
-                <Sync className="h-4 w-4 mr-2" />
+                <RefreshCw className="h-4 w-4 mr-2" />
                 {isLoading ? 'Syncing...' : 'Sync Calendar'}
               </button>
             )}

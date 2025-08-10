@@ -194,7 +194,7 @@ class ApiService {
       completed: boolean
       notes?: string
       created_at: string
-    }>>>(`/calendar/upcoming${params}`)
+    }>>(`/calendar/upcoming${params}`)
   }
 
   async getCalendarStats(days?: number) {
